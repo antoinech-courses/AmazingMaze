@@ -6,8 +6,9 @@ use std::rc::Rc;
 // Enumeration to represent the exploration status
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Exploration {
-    Explored,
-    UnExplored,
+    Explored,           // Fully explored
+    PartiallyExplored,  // Left child explored, right child to be explored
+    UnExplored,         // Not yet explored
 }
 
 // Enumeration to represent the maze
@@ -42,22 +43,27 @@ impl Maze {
         })
     }
 
-    // Method to explore the maze
-    fn explore(&self, trace: &mut Vec<String>) {
+    // Concurrent version of the exploration function
+    fn explore(&self, node: Rc<Maze>, work: &mut Vec<Rc<Maze>>, trace: &mut Vec<String>) {
         match self {
             Maze::Branch { label, left, right, status } => {
-                // Check the current status of the branch
                 let current_status = *status.borrow();
                 match current_status {
                     Exploration::UnExplored => {
-                        // Update the status and explore the child branches
-                        status.replace(Exploration::Explored);
+                        // Push the current branch onto the work stack
+                        status.replace(Exploration::PartiallyExplored); // Update the status
                         trace.push(label.clone());
-                        left.explore(trace);
-                        right.explore(trace);
+                        work.push(node.clone()); // Push the current node to the work stack
+                        left.explore(Rc::clone(left), work, trace); // Explore the left child
+                    }
+                    Exploration::PartiallyExplored => {
+                        // The left child has already been explored, now explore the right
+                        status.replace(Exploration::Explored); // Mark this branch as fully explored
+                        trace.push(label.clone());
+                        right.explore(Rc::clone(right), work, trace); // Explore the right child
                     }
                     Exploration::Explored => {
-                        // If the branch has already been explored, just record the label
+                        // If the branch is already fully explored, just add it to the trace
                         trace.push(label.clone());
                     }
                 }
@@ -90,12 +96,16 @@ fn maze() -> Rc<Maze> {
 
 fn main() {
     // Build the maze
-    let labyrinth = maze();
+    let maze = maze();
 
-    // Explore the maze
-    let mut trace: Vec<String> = Vec::new();
-    labyrinth.explore(&mut trace);
+    // Initialize the work stack with the root node
+    let mut work: Vec<Rc<Maze>> = vec![Rc::clone(&maze)];
+    let mut trace: Vec<String> = vec![];
 
-    // Print the trace
-    println!("{:?}", trace);
+    // Simulate concurrent exploration
+    while !work.is_empty() {
+        let node = work.pop().expect("work stack should not be empty");
+        node.explore(Rc::clone(&node), &mut work, &mut trace);
+        println!("Trace so far: {:?}", trace);
+    }
 }
