@@ -51,7 +51,7 @@ impl Maze {
                         *current_status = Exploration::PartiallyExplored;
                         trace.push(label.clone());
                         work.lock().unwrap().push(Arc::clone(left));
-                        work.lock().unwrap().push(Arc::clone(self));
+                        work.lock().unwrap().push(Arc::clone(right));
                     }
                     Exploration::PartiallyExplored => {
                         *current_status = Exploration::Explored;
